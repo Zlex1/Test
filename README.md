@@ -1,631 +1,563 @@
 --[[
-    ORA CORE - Com Preview 3D Sempre Ativo (SEM NOTIFICAÇÕES)
+    Cobalt Clone Hub
+    Versión: 1.0
+    Para ejecutar comandos de clonación
 ]]
 
-local Luna = loadstring(game:HttpGet("https://raw.githubusercontent.com/Nebula-Softworks/Luna-Interface-Suite/refs/heads/master/source.lua", true))()
-
 local Players = game:GetService("Players")
-local LP = Players.LocalPlayer
-local RunService = game:GetService("RunService")
-local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 
--- ================= CONFIGURAÇÕES =================
-local HubConfig = {
-    Name = "Ora Core",
-    Subtitle = "Hub de Customização",
-    LogoID = "120245531583106",
-    LoadingEnabled = true,
-    LoadingTitle = "Ora Core",
-    LoadingSubtitle = "Carregando...",
-    ConfigSettings = {
-        RootFolder = nil,
-        ConfigFolder = "ORACORE"
-    },
-    KeySystem = false
+-- Variables de configuración
+getgenv().CloneSettings = {
+    Enabled = true,
+    AutoClone = false,
+    CloneInterval = 1,
+    CurrentKey = "K",
+    CurrentValue = 854848,
+    ShowNotifications = true,
 }
 
--- ================= CRIAÇÃO DA JANELA =================
-local Window = Luna:CreateWindow(HubConfig)
+local Settings = getgenv().CloneSettings
 
--- ================= VARIÁVEIS DO PREVIEW 3D =================
-local previewCamera = nil
-local previewModel = nil
-local isPreviewActive = false
-local previewScreenGui = nil
-local viewportFrame = nil
-local rotationAngle = 0
-local previewCreated = false
+-- Variables del hub
+local Hub = {
+    ToggleKey = Enum.KeyCode.RightShift,
+    IsOpen = false,
+    Dragging = false,
+    DragInput = nil,
+    DragStart = nil,
+    StartPos = nil,
+}
 
--- ================= FUNÇÕES PRINCIPAIS =================
-
-local function sendColor(cmd, r, g, b)
-    if not LP:FindFirstChild("startevent") then 
-        return false 
+-- Funciones de clonación
+local function ExecuteClone(value, key)
+    if not Settings.Enabled then return end
+    
+    local keyToUse = key or Settings.CurrentKey
+    local valueToUse = value or Settings.CurrentValue
+    
+    -- Ejecutar AttemptWithdrawCloneMachine
+    local Event1 = ReplicatedStorage:FindFirstChild("Remote")
+    if Event1 then
+        local WithdrawEvent = Event1:FindFirstChild("AttemptWithdrawCloneMachine")
+        if WithdrawEvent then
+            WithdrawEvent:FireServer(keyToUse)
+            if Settings.ShowNotifications then
+                print("🔄 Clonación iniciada con clave: " .. keyToUse)
+            end
+        end
     end
     
-    local success, err = pcall(function()
-        LP.startevent:FireServer(
-            cmd,
-            string.format("%.2f,%.2f,%.2f", r/255, g/255, b/255)
-        )
+    -- Ejecutar AttemptClone
+    local Event2 = ReplicatedStorage:FindFirstChild("Remote")
+    if Event2 then
+        local CloneEvent = Event2:FindFirstChild("AttemptClone")
+        if CloneEvent then
+            CloneEvent:FireServer(valueToUse, keyToUse)
+            if Settings.ShowNotifications then
+                print("✅ Clon ejecutado con valor: " .. tostring(valueToUse) .. " y clave: " .. keyToUse)
+            end
+        end
+    end
+end
+
+-- Sistema de auto-clonación
+local AutoCloneRunning = false
+local AutoCloneConnection = nil
+
+local function StartAutoClone()
+    if AutoCloneRunning then return end
+    AutoCloneRunning = true
+    
+    AutoCloneConnection = game:GetService("RunService").Heartbeat:Connect(function()
+        if Settings.AutoClone and Settings.Enabled then
+            ExecuteClone()
+        end
     end)
     
-    if isPreviewActive then
-        updatePreview()
-    end
-    
-    return success
+    print("🔄 Auto-clonación iniciada (Intervalo: " .. Settings.CloneInterval .. "s)")
 end
 
-local function applyMask(mask)
-    if LP:FindFirstChild("startevent") then
-        local success, err = pcall(function()
-            LP.startevent:FireServer("mask", mask)
+local function StopAutoClone()
+    AutoCloneRunning = false
+    if AutoCloneConnection then
+        AutoCloneConnection:Disconnect()
+        AutoCloneConnection = nil
+    end
+    print("⏹️ Auto-clonación detenida")
+end
+
+-- Crear la interfaz del hub
+local function CreateHub()
+    -- ScreenGui principal
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "CobaltCloneHub"
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    ScreenGui.ResetOnSpawn = false
+
+    -- Frame principal
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Name = "MainFrame"
+    MainFrame.Size = UDim2.new(0, 400, 0, 480)
+    MainFrame.Position = UDim2.new(0.5, -200, 0.5, -240)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+    MainFrame.BackgroundTransparency = 0.05
+    MainFrame.BorderSizePixel = 0
+    MainFrame.ClipsDescendants = true
+    MainFrame.Parent = ScreenGui
+
+    -- Sombra y bordes
+    local Shadow = Instance.new("Frame")
+    Shadow.Name = "Shadow"
+    Shadow.Size = UDim2.new(1, 0, 1, 0)
+    Shadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    Shadow.BackgroundTransparency = 0.7
+    Shadow.BorderSizePixel = 0
+    Shadow.Parent = MainFrame
+
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 12)
+    Corner.Parent = MainFrame
+
+    local Stroke = Instance.new("UIStroke")
+    Stroke.Color = Color3.fromRGB(80, 50, 150)
+    Stroke.Thickness = 2
+    Stroke.Parent = MainFrame
+
+    -- Barra de título con gradiente
+    local TitleBar = Instance.new("Frame")
+    TitleBar.Name = "TitleBar"
+    TitleBar.Size = UDim2.new(1, 0, 0, 45)
+    TitleBar.BackgroundColor3 = Color3.fromRGB(40, 30, 60)
+    TitleBar.BackgroundTransparency = 0.2
+    TitleBar.BorderSizePixel = 0
+    TitleBar.Parent = MainFrame
+
+    local TitleBarCorner = Instance.new("UICorner")
+    TitleBarCorner.CornerRadius = UDim.new(0, 12)
+    TitleBarCorner.Parent = TitleBar
+
+    -- Icono y título
+    local TitleText = Instance.new("TextLabel")
+    TitleText.Name = "TitleText"
+    TitleText.Size = UDim2.new(1, -60, 1, 0)
+    TitleText.Position = UDim2.new(0, 10, 0, 0)
+    TitleText.BackgroundTransparency = 1
+    TitleText.Text = "⚡ Cobalt Clone Hub"
+    TitleText.TextColor3 = Color3.fromRGB(180, 150, 255)
+    TitleText.TextSize = 18
+    TitleText.TextXAlignment = Enum.TextXAlignment.Left
+    TitleText.Font = Enum.Font.GothamBold
+    TitleText.Parent = TitleBar
+
+    -- Botón de cerrar
+    local CloseButton = Instance.new("TextButton")
+    CloseButton.Name = "CloseButton"
+    CloseButton.Size = UDim2.new(0, 30, 0, 30)
+    CloseButton.Position = UDim2.new(1, -38, 0, 7)
+    CloseButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    CloseButton.BackgroundTransparency = 0.5
+    CloseButton.BorderSizePixel = 0
+    CloseButton.Text = "✕"
+    CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    CloseButton.TextSize = 18
+    CloseButton.Font = Enum.Font.GothamBold
+    CloseButton.Parent = TitleBar
+
+    local CloseCorner = Instance.new("UICorner")
+    CloseCorner.CornerRadius = UDim.new(0, 6)
+    CloseCorner.Parent = CloseButton
+
+    CloseButton.MouseButton1Click:Connect(function()
+        Hub.IsOpen = false
+        MainFrame:TweenSize(UDim2.new(0, 0, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
+        task.wait(0.3)
+        ScreenGui.Enabled = false
+    end)
+
+    -- Contenedor scroll
+    local ScrollContainer = Instance.new("ScrollingFrame")
+    ScrollContainer.Name = "ScrollContainer"
+    ScrollContainer.Size = UDim2.new(1, -20, 1, -55)
+    ScrollContainer.Position = UDim2.new(0, 10, 0, 50)
+    ScrollContainer.BackgroundTransparency = 1
+    ScrollContainer.BorderSizePixel = 0
+    ScrollContainer.ScrollBarThickness = 4
+    ScrollContainer.ScrollBarImageColor3 = Color3.fromRGB(80, 60, 120)
+    ScrollContainer.Parent = MainFrame
+
+    local Layout = Instance.new("UIListLayout")
+    Layout.Padding = UDim.new(0, 8)
+    Layout.SortOrder = Enum.SortOrder.LayoutOrder
+    Layout.Parent = ScrollContainer
+
+    -- Función para crear secciones
+    local function CreateSection(text, icon)
+        local Section = Instance.new("Frame")
+        Section.Size = UDim2.new(1, 0, 0, 30)
+        Section.BackgroundTransparency = 1
+        Section.Parent = ScrollContainer
+
+        local Label = Instance.new("TextLabel")
+        Label.Size = UDim2.new(1, 0, 1, 0)
+        Label.BackgroundTransparency = 1
+        Label.Text = (icon or "▸") .. " " .. text
+        Label.TextColor3 = Color3.fromRGB(160, 140, 200)
+        Label.TextSize = 14
+        Label.TextXAlignment = Enum.TextXAlignment.Left
+        Label.Font = Enum.Font.GothamSemibold
+        Label.Parent = Section
+
+        return Section
+    end
+
+    -- Función para crear toggle
+    local function CreateToggle(text, settingKey, defaultValue)
+        local ToggleFrame = Instance.new("Frame")
+        ToggleFrame.Size = UDim2.new(1, 0, 0, 35)
+        ToggleFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+        ToggleFrame.BackgroundTransparency = 0.3
+        ToggleFrame.BorderSizePixel = 0
+        ToggleFrame.Parent = ScrollContainer
+
+        local Corner = Instance.new("UICorner")
+        Corner.CornerRadius = UDim.new(0, 6)
+        Corner.Parent = ToggleFrame
+
+        local Label = Instance.new("TextLabel")
+        Label.Size = UDim2.new(0.7, -10, 1, 0)
+        Label.Position = UDim2.new(0, 10, 0, 0)
+        Label.BackgroundTransparency = 1
+        Label.Text = text
+        Label.TextColor3 = Color3.fromRGB(200, 200, 210)
+        Label.TextSize = 13
+        Label.TextXAlignment = Enum.TextXAlignment.Left
+        Label.Font = Enum.Font.Gotham
+        Label.Parent = ToggleFrame
+
+        local Button = Instance.new("TextButton")
+        Button.Size = UDim2.new(0, 50, 0, 25)
+        Button.Position = UDim2.new(1, -60, 0, 5)
+        Button.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+        Button.BorderSizePixel = 0
+        Button.Text = "OFF"
+        Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+        Button.TextSize = 12
+        Button.Font = Enum.Font.GothamBold
+        Button.Parent = ToggleFrame
+
+        local ButtonCorner = Instance.new("UICorner")
+        ButtonCorner.CornerRadius = UDim.new(0, 4)
+        ButtonCorner.Parent = Button
+
+        -- Estado
+        local state = Settings[settingKey] ~= nil and Settings[settingKey] or defaultValue
+        Settings[settingKey] = state
+
+        local function UpdateButton()
+            if state then
+                Button.BackgroundColor3 = Color3.fromRGB(100, 50, 200)
+                Button.Text = "ON"
+            else
+                Button.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+                Button.Text = "OFF"
+            end
+        end
+        UpdateButton()
+
+        Button.MouseButton1Click:Connect(function()
+            state = not state
+            Settings[settingKey] = state
+            UpdateButton()
+            
+            -- Manejar auto-clonación
+            if settingKey == "AutoClone" then
+                if state then
+                    StartAutoClone()
+                else
+                    StopAutoClone()
+                end
+            end
         end)
-        
-        if isPreviewActive and success then
-            updatePreview()
-        end
-        
-        return success
-    end
-    return false
-end
 
-local function applyCustomOutfit(shirtId, pantsId)
-    if LP:FindFirstChild("startevent") then
-        local success, err = pcall(function()
-            LP.startevent:FireServer("customoutfit", shirtId, pantsId)
+        return Button
+    end
+
+    -- Función para crear slider
+    local function CreateSlider(text, settingKey, min, max, defaultValue, format)
+        local SliderFrame = Instance.new("Frame")
+        SliderFrame.Size = UDim2.new(1, 0, 0, 50)
+        SliderFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+        SliderFrame.BackgroundTransparency = 0.3
+        SliderFrame.BorderSizePixel = 0
+        SliderFrame.Parent = ScrollContainer
+
+        local Corner = Instance.new("UICorner")
+        Corner.CornerRadius = UDim.new(0, 6)
+        Corner.Parent = SliderFrame
+
+        local Label = Instance.new("TextLabel")
+        Label.Size = UDim2.new(0.6, -10, 0, 20)
+        Label.Position = UDim2.new(0, 10, 0, 2)
+        Label.BackgroundTransparency = 1
+        Label.Text = text
+        Label.TextColor3 = Color3.fromRGB(200, 200, 210)
+        Label.TextSize = 13
+        Label.TextXAlignment = Enum.TextXAlignment.Left
+        Label.Font = Enum.Font.Gotham
+        Label.Parent = SliderFrame
+
+        local ValueLabel = Instance.new("TextLabel")
+        ValueLabel.Size = UDim2.new(0.3, 0, 0, 20)
+        ValueLabel.Position = UDim2.new(0.7, 0, 0, 2)
+        ValueLabel.BackgroundTransparency = 1
+        ValueLabel.TextColor3 = Color3.fromRGB(160, 140, 200)
+        ValueLabel.TextSize = 13
+        ValueLabel.TextXAlignment = Enum.TextXAlignment.Right
+        ValueLabel.Font = Enum.Font.Gotham
+        ValueLabel.Parent = SliderFrame
+
+        local Slider = Instance.new("Frame")
+        Slider.Size = UDim2.new(0.9, -20, 0, 4)
+        Slider.Position = UDim2.new(0, 10, 0, 35)
+        Slider.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+        Slider.BorderSizePixel = 0
+        Slider.Parent = SliderFrame
+
+        local SliderCorner = Instance.new("UICorner")
+        SliderCorner.CornerRadius = UDim.new(0, 2)
+        SliderCorner.Parent = Slider
+
+        local Fill = Instance.new("Frame")
+        Fill.Size = UDim2.new(0.5, 0, 1, 0)
+        Fill.BackgroundColor3 = Color3.fromRGB(120, 80, 220)
+        Fill.BorderSizePixel = 0
+        Fill.Parent = Slider
+
+        local FillCorner = Instance.new("UICorner")
+        FillCorner.CornerRadius = UDim.new(0, 2)
+        FillCorner.Parent = Fill
+
+        -- Estado
+        local value = Settings[settingKey] ~= nil and Settings[settingKey] or defaultValue
+        Settings[settingKey] = value
+
+        local function UpdateSlider()
+            local percent = (value - min) / (max - min)
+            Fill.Size = UDim2.new(percent, 0, 1, 0)
+            ValueLabel.Text = format and format(value) or tostring(value)
+        end
+        UpdateSlider()
+
+        -- Input
+        local function onSliderInput(input)
+            local pos = input.Position.X
+            local size = Slider.AbsoluteSize.X
+            local percent = math.clamp((pos - Slider.AbsolutePosition.X) / size, 0, 1)
+            value = min + (max - min) * percent
+            value = math.round(value * 1000) / 1000
+            Settings[settingKey] = value
+            UpdateSlider()
+        end
+
+        Slider.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                onSliderInput(input)
+                local connection
+                connection = UserInputService.InputChanged:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseMovement then
+                        onSliderInput(input)
+                    end
+                end)
+                UserInputService.InputEnded:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                        connection:Disconnect()
+                    end
+                end)
+            end
         end)
-        
-        if isPreviewActive and success then
-            updatePreview()
-        end
-        
-        return success
-    end
-    return false
-end
 
-local function resetOutfit()
-    if LP:FindFirstChild("startevent") then
-        local success, err = pcall(function()
-            LP.startevent:FireServer("resetoutfit")
+        return Slider
+    end
+
+    -- Función para crear textbox
+    local function CreateTextBox(text, settingKey, placeholder)
+        local TextBoxFrame = Instance.new("Frame")
+        TextBoxFrame.Size = UDim2.new(1, 0, 0, 35)
+        TextBoxFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+        TextBoxFrame.BackgroundTransparency = 0.3
+        TextBoxFrame.BorderSizePixel = 0
+        TextBoxFrame.Parent = ScrollContainer
+
+        local Corner = Instance.new("UICorner")
+        Corner.CornerRadius = UDim.new(0, 6)
+        Corner.Parent = TextBoxFrame
+
+        local Label = Instance.new("TextLabel")
+        Label.Size = UDim2.new(0.35, -10, 1, 0)
+        Label.Position = UDim2.new(0, 10, 0, 0)
+        Label.BackgroundTransparency = 1
+        Label.Text = text
+        Label.TextColor3 = Color3.fromRGB(200, 200, 210)
+        Label.TextSize = 13
+        Label.TextXAlignment = Enum.TextXAlignment.Left
+        Label.Font = Enum.Font.Gotham
+        Label.Parent = TextBoxFrame
+
+        local Input = Instance.new("TextBox")
+        Input.Size = UDim2.new(0.55, -10, 0, 25)
+        Input.Position = UDim2.new(0.45, 0, 0, 5)
+        Input.BackgroundColor3 = Color3.fromRGB(45, 45, 65)
+        Input.BorderSizePixel = 0
+        Input.TextColor3 = Color3.fromRGB(255, 255, 255)
+        Input.TextSize = 12
+        Input.Font = Enum.Font.Gotham
+        Input.PlaceholderText = placeholder or "Valor..."
+        Input.Parent = TextBoxFrame
+
+        local InputCorner = Instance.new("UICorner")
+        InputCorner.CornerRadius = UDim.new(0, 4)
+        InputCorner.Parent = Input
+
+        -- Cargar valor actual
+        if Settings[settingKey] then
+            Input.Text = tostring(Settings[settingKey])
+        end
+
+        Input.FocusLost:Connect(function()
+            local val = Input.Text
+            if val and val ~= "" then
+                if settingKey == "CurrentKey" then
+                    Settings[settingKey] = val
+                    print("🔑 Clave actualizada a: " .. val)
+                elseif settingKey == "CurrentValue" then
+                    local numVal = tonumber(val)
+                    if numVal then
+                        Settings[settingKey] = numVal
+                        print("🔢 Valor actualizado a: " .. numVal)
+                    end
+                end
+            end
         end)
-        
-        if isPreviewActive and success then
-            updatePreview()
-        end
-        
-        return success
-    end
-    return false
-end
 
--- ================= FUNÇÕES DO PREVIEW 3D =================
+        return Input
+    end
 
-local function createPreview()
-    if not LP.Character or not LP.Character:FindFirstChild("Humanoid") then
-        return false
+    -- Función para crear botón de acción
+    local function CreateActionButton(text, color, action)
+        local Button = Instance.new("TextButton")
+        Button.Size = UDim2.new(1, 0, 0, 40)
+        Button.BackgroundColor3 = color or Color3.fromRGB(80, 50, 150)
+        Button.BorderSizePixel = 0
+        Button.Text = text
+        Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+        Button.TextSize = 14
+        Button.Font = Enum.Font.GothamBold
+        Button.Parent = ScrollContainer
+
+        local Corner = Instance.new("UICorner")
+        Corner.CornerRadius = UDim.new(0, 6)
+        Corner.Parent = Button
+
+        Button.MouseButton1Click:Connect(action)
+        return Button
     end
+
+    -- Construir la interfaz
+
+    -- Sección: Control Principal
+    CreateSection("🎮 Control Principal")
+    CreateToggle("Módulo activado", "Enabled", true)
+    CreateToggle("Auto-Clonación", "AutoClone", false)
+    CreateToggle("Mostrar notificaciones", "ShowNotifications", true)
+    CreateSlider("Intervalo de clonación", "CloneInterval", 0.1, 5, 1, function(v) return string.format("%.1fs", v) end)
+
+    -- Sección: Configuración
+    CreateSection("⚙️ Configuración")
+    CreateTextBox("Clave (Key)", "CurrentKey", "Ej: K")
+    CreateTextBox("Valor (Value)", "CurrentValue", "Ej: 854848")
+
+    -- Sección: Acciones
+    CreateSection("🚀 Acciones Rápidas")
     
-    -- Remove preview antigo
-    if previewModel then
-        previewModel:Destroy()
-        previewModel = nil
-    end
-    
-    if previewScreenGui then
-        previewScreenGui:Destroy()
-        previewScreenGui = nil
-    end
-    
-    local character = LP.Character
-    local humanoid = character:FindFirstChild("Humanoid")
-    
-    if not humanoid then
-        return false
-    end
-    
-    -- Clona o personagem
-    previewModel = character:Clone()
-    previewModel.Parent = workspace
-    
-    -- Remove scripts
-    for _, child in pairs(previewModel:GetDescendants()) do
-        if child:IsA("Script") or child:IsA("LocalScript") then
-            child:Destroy()
+    -- Botón para clonación manual
+    CreateActionButton("⚡ Ejecutar Clonación", Color3.fromRGB(120, 80, 220), function()
+        ExecuteClone()
+        if Settings.ShowNotifications then
+            print("⚡ Clonación ejecutada manualmente")
         end
-    end
+    end)
+
+    -- Botón para clonación con valores personalizados
+    CreateActionButton("🔄 Clonación Rápida (K)", Color3.fromRGB(80, 50, 150), function()
+        ExecuteClone(854848, "K")
+    end)
+
+    -- Botón para detener auto-clonación
+    CreateActionButton("⏹️ Detener Auto-Clonación", Color3.fromRGB(200, 50, 50), function()
+        Settings.AutoClone = false
+        StopAutoClone()
+        -- Actualizar toggle visualmente
+        for _, child in pairs(ScrollContainer:GetChildren()) do
+            if child:IsA("Frame") then
+                for _, btn in pairs(child:GetChildren()) do
+                    if btn:IsA("TextButton") and btn.Text == "ON" then
+                        -- Buscar toggle de AutoClone
+                        local label = child:FindFirstChild("TextLabel")
+                        if label and label.Text == "Auto-Clonación" then
+                            btn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+                            btn.Text = "OFF"
+                        end
+                    end
+                end
+            end
+        end
+    end)
+
+    -- Sección: Información
+    CreateSection("ℹ️ Información")
     
-    -- Configura o Humanoid
-    local previewHumanoid = previewModel:FindFirstChild("Humanoid")
-    if previewHumanoid then
-        previewHumanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
-        previewHumanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
-        previewHumanoid.AutoRotate = false
-        previewHumanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
-        previewHumanoid.Jump = false
-        previewHumanoid.PlatformStand = true
-    end
-    
-    -- Posiciona o personagem
-    previewModel:SetPrimaryPartCFrame(CFrame.new(0, 0, 20))
-    
-    -- Cria a UI para o preview
-    previewScreenGui = Instance.new("ScreenGui")
-    previewScreenGui.Parent = LP.PlayerGui
-    previewScreenGui.Name = "PreviewGUI"
-    previewScreenGui.ResetOnSpawn = false
-    previewScreenGui.IgnoreGuiInset = true
-    
-    -- Cria o ViewportFrame
-    viewportFrame = Instance.new("ViewportFrame")
-    viewportFrame.Parent = previewScreenGui
-    viewportFrame.Size = UDim2.new(0.35, 0, 0.6, 0)
-    viewportFrame.Position = UDim2.new(0.325, 0, 0.2, 0)
-    viewportFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-    viewportFrame.BackgroundTransparency = 0.2
-    viewportFrame.BorderSizePixel = 0
-    
-    -- Adiciona borda arredondada
-    local corner = Instance.new("UICorner")
-    corner.Parent = viewportFrame
-    corner.CornerRadius = UDim.new(0, 12)
-    
-    -- Adiciona borda
-    local border = Instance.new("Frame")
-    border.Parent = viewportFrame
-    border.Size = UDim2.new(1, 0, 1, 0)
-    border.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    border.BackgroundTransparency = 0.92
-    border.BorderSizePixel = 0
-    border.ZIndex = 0
-    
-    local borderCorner = Instance.new("UICorner")
-    borderCorner.Parent = border
-    borderCorner.CornerRadius = UDim.new(0, 12)
-    
-    -- Adiciona o personagem ao ViewportFrame
-    viewportFrame.WorldRoot = previewModel
-    
-    -- Cria câmera para o preview
-    previewCamera = Instance.new("Camera")
-    previewCamera.Parent = viewportFrame
-    viewportFrame.CurrentCamera = previewCamera
-    
-    -- Configura a câmera
-    previewCamera.CFrame = CFrame.new(
-        Vector3.new(0, 1.8, 8),
-        Vector3.new(0, 1.5, 0)
-    )
-    previewCamera.FieldOfView = 45
-    
-    -- Fundo gradiente
-    local background = Instance.new("Frame")
-    background.Parent = viewportFrame
-    background.Size = UDim2.new(1, 0, 1, 0)
-    background.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
-    background.BackgroundTransparency = 0.5
-    background.ZIndex = 0
-    
-    local gradient = Instance.new("UIGradient")
-    gradient.Parent = background
-    gradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(40, 35, 60)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 15, 25))
-    })
-    
-    -- Iluminação
-    local light = Instance.new("PointLight")
-    light.Parent = viewportFrame
-    light.Position = Vector3.new(0, 5, 5)
-    light.Color = Color3.fromRGB(255, 255, 255)
-    light.Brightness = 2
-    light.Range = 20
-    
-    local light2 = Instance.new("PointLight")
-    light2.Parent = viewportFrame
-    light2.Position = Vector3.new(-3, 2, 3)
-    light2.Color = Color3.fromRGB(200, 180, 255)
-    light2.Brightness = 1
-    light2.Range = 15
-    
-    local shadow = Instance.new("DirectionalLight")
-    shadow.Parent = viewportFrame
-    shadow.Brightness = 0.3
-    shadow.Color = Color3.fromRGB(150, 150, 200)
-    
-    isPreviewActive = true
-    previewCreated = true
-    rotationAngle = 0
-    
-    -- Rotação automática
-    task.spawn(function()
-        while isPreviewActive and viewportFrame and previewModel do
-            rotationAngle = rotationAngle + 0.4
-            if previewModel.PrimaryPart then
-                previewModel:SetPrimaryPartCFrame(
-                    CFrame.new(0, 0, 20) * CFrame.Angles(0, math.rad(rotationAngle), 0)
+    local InfoLabel = Instance.new("TextLabel")
+    InfoLabel.Size = UDim2.new(1, -20, 0, 80)
+    InfoLabel.Position = UDim2.new(0, 10, 0, 0)
+    InfoLabel.BackgroundTransparency = 1
+    InfoLabel.Text = "Keybind: RightShift\nCreado con Cobalt\nhttps://github.com/notpoiu/cobalt"
+    InfoLabel.TextColor3 = Color3.fromRGB(150, 150, 180)
+    InfoLabel.TextSize = 12
+    InfoLabel.TextXAlignment = Enum.TextXAlignment.Left
+    InfoLabel.TextYAlignment = Enum.TextYAlignment.Top
+    InfoLabel.Font = Enum.Font.Gotham
+    InfoLabel.Parent = ScrollContainer
+
+    -- Aplicar layout
+    Layout:Apply()
+
+    -- Hacer la ventana arrastrable
+    local function MakeDraggable()
+        local dragging = false
+        local dragStart = nil
+        local startPos = nil
+
+        TitleBar.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = true
+                dragStart = input.Position
+                startPos = MainFrame.Position
+            end
+        end)
+
+        TitleBar.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
+                local delta = input.Position - dragStart
+                MainFrame.Position = UDim2.new(
+                    startPos.X.Scale,
+                    startPos.X.Offset + delta.X,
+                    startPos.Y.Scale,
+                    startPos.Y.Offset + delta.Y
                 )
             end
-            task.wait(0.05)
-        end
-    end)
-    
-    return true
-end
-
-local function updatePreview()
-    if not isPreviewActive or not previewModel then
-        return
-    end
-    
-    local character = LP.Character
-    if not character then
-        return
-    end
-    
-    -- Remove modelo antigo
-    if previewModel then
-        previewModel:Destroy()
-        previewModel = nil
-    end
-    
-    -- Cria novo modelo atualizado
-    previewModel = character:Clone()
-    previewModel.Parent = workspace
-    
-    -- Remove scripts
-    for _, child in pairs(previewModel:GetDescendants()) do
-        if child:IsA("Script") or child:IsA("LocalScript") then
-            child:Destroy()
-        end
-    end
-    
-    -- Configura Humanoid
-    local previewHumanoid = previewModel:FindFirstChild("Humanoid")
-    if previewHumanoid then
-        previewHumanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
-        previewHumanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
-        previewHumanoid.AutoRotate = false
-        previewHumanoid.PlatformStand = true
-    end
-    
-    -- Posiciona com rotação atual
-    previewModel:SetPrimaryPartCFrame(
-        CFrame.new(0, 0, 20) * CFrame.Angles(0, math.rad(rotationAngle), 0)
-    )
-    
-    -- Atualiza ViewportFrame
-    if viewportFrame then
-        viewportFrame.WorldRoot = previewModel
-    end
-    
-    -- Mantém câmera
-    if previewCamera then
-        previewCamera.CFrame = CFrame.new(
-            Vector3.new(0, 1.8, 8),
-            Vector3.new(0, 1.5, 0)
-        )
-    end
-end
-
-local function destroyPreview()
-    isPreviewActive = false
-    previewCreated = false
-    
-    if previewModel then
-        previewModel:Destroy()
-        previewModel = nil
-    end
-    
-    if previewScreenGui then
-        previewScreenGui:Destroy()
-        previewScreenGui = nil
-    end
-    
-    viewportFrame = nil
-    previewCamera = nil
-end
-
-local function recreatePreview()
-    if previewCreated then
-        destroyPreview()
-        task.wait(0.5)
-        createPreview()
-    end
-end
-
--- Detecta respawn do personagem
-LP.CharacterAdded:Connect(function(character)
-    task.wait(1)
-    if previewCreated then
-        recreatePreview()
-    end
-end)
-
-local MASKS = {
-    "maski", "maska", "maskb", "maskc", "maskd",
-    "maske", "maskf", "maskg", "maskh", "maskj"
-}
-
--- Variáveis para armazenar os valores atuais
-local currentHairColor = Color3.fromRGB(255, 255, 255)
-local currentSkinColor = Color3.fromRGB(255, 219, 172)
-
--- ================= HOME TAB =================
-Window:CreateHomeTab({
-    SupportedExecutors = {
-        "Synapse X", "Krnl", "ProtoSmasher", "Fluxus",
-        "Script-Ware", "EasyExploits", "Electron", "JJSploit",
-        "Calamari", "SirHurt", "Sentinel", "WEAREDEVS",
-        "Comet", "Cellery", "Wave", "CODex", "Delta"
-    },
-    DiscordInvite = "oracore",
-    Icon = 1
-})
-
--- ================= TAB DE PREVIEW 3D =================
-local PreviewTab = Window:CreateTab({
-    Name = "🎮 Preview 3D",
-    Icon = "3d_rotation",
-    ImageSource = "Material",
-    ShowTitle = true
-})
-
-PreviewTab:CreateSection("👤 Visualização 3D")
-
-PreviewTab:CreateParagraph({
-    Title = "📖 Sobre o Preview",
-    Text = "Seu personagem em 3D está SEMPRE ATIVO!\n\n" ..
-           "• Visualização em tempo real\n" ..
-           "• Gira automaticamente\n" ..
-           "• Atualiza com todas as alterações\n" ..
-           "• Recria automaticamente após respawn"
-})
-
-PreviewTab:CreateButton({
-    Name = "🔄 Recriar Preview",
-    Callback = function()
-        recreatePreview()
-    end
-})
-
--- ================= TAB DE CORES =================
-local ColorsTab = Window:CreateTab({
-    Name = "🎨 Cores",
-    Icon = "palette",
-    ImageSource = "Material",
-    ShowTitle = true
-})
-
--- Seção Cabelo
-ColorsTab:CreateSection("💇‍♂️ Cabelo")
-
-local HairColorInput = ColorsTab:CreateInput({
-    Name = "RGB Manual",
-    PlaceholderText = "255,255,255",
-    CurrentValue = "255,255,255",
-    Numeric = false,
-    Callback = function(Text)
-        local r, g, b = Text:match("(%d+),(%d+),(%d+)")
-        if r and g and b then
-            local color = Color3.fromRGB(tonumber(r), tonumber(g), tonumber(b))
-            currentHairColor = color
-            pcall(function()
-                HairColorPicker:SetColor(color)
-            end)
-        end
-    end
-}, "Input")
-
-local HairColorPicker = ColorsTab:CreateColorPicker({
-    Name = "Cor do Cabelo",
-    Color = Color3.fromRGB(255, 255, 255),
-    Flag = "HairColor",
-    Callback = function(Color)
-        if Color then
-            currentHairColor = Color
-            local r = math.floor(Color.R * 255)
-            local g = math.floor(Color.G * 255)
-            local b = math.floor(Color.B * 255)
-            pcall(function()
-                HairColorInput:SetText(string.format("%d,%d,%d", r, g, b))
-            end)
-        end
-    end
-}, "ColorPicker")
-
-ColorsTab:CreateButton({
-    Name = "Aplicar Cor do Cabelo",
-    Callback = function()
-        local color = currentHairColor
-        local r = math.floor(color.R * 255)
-        local g = math.floor(color.G * 255)
-        local b = math.floor(color.B * 255)
-        sendColor("haircolor", r, g, b)
-    end
-})
-
--- Divider e Seção Pele
-ColorsTab:CreateDivider()
-ColorsTab:CreateSection("👤 Pele")
-
-local SkinColorInput = ColorsTab:CreateInput({
-    Name = "RGB Manual",
-    PlaceholderText = "255,219,172",
-    CurrentValue = "255,219,172",
-    Numeric = false,
-    Callback = function(Text)
-        local r, g, b = Text:match("(%d+),(%d+),(%d+)")
-        if r and g and b then
-            local color = Color3.fromRGB(tonumber(r), tonumber(g), tonumber(b))
-            currentSkinColor = color
-            pcall(function()
-                SkinColorPicker:SetColor(color)
-            end)
-        end
-    end
-}, "Input")
-
-local SkinColorPicker = ColorsTab:CreateColorPicker({
-    Name = "Cor da Pele",
-    Color = Color3.fromRGB(255, 219, 172),
-    Flag = "SkinColor",
-    Callback = function(Color)
-        if Color then
-            currentSkinColor = Color
-            local r = math.floor(Color.R * 255)
-            local g = math.floor(Color.G * 255)
-            local b = math.floor(Color.B * 255)
-            pcall(function()
-                SkinColorInput:SetText(string.format("%d,%d,%d", r, g, b))
-            end)
-        end
-    end
-}, "ColorPicker")
-
-ColorsTab:CreateButton({
-    Name = "Aplicar Cor da Pele",
-    Callback = function()
-        local color = currentSkinColor
-        local r = math.floor(color.R * 255)
-        local g = math.floor(color.G * 255)
-        local b = math.floor(color.B * 255)
-        sendColor("skin", r, g, b)
-    end
-})
-
--- ================= TAB DE VESTUÁRIO =================
-local ClothingTab = Window:CreateTab({
-    Name = "👕 Vestuário",
-    Icon = "checkroom",
-    ImageSource = "Material",
-    ShowTitle = true
-})
-
--- Seção Roupas
-ClothingTab:CreateSection("👔 Roupas")
-
-local ShirtInput = ClothingTab:CreateInput({
-    Name = "ID da Camisa",
-    PlaceholderText = "123456789",
-    CurrentValue = "",
-    Numeric = true,
-    Callback = function(Text) end
-}, "Input")
-
-local PantsInput = ClothingTab:CreateInput({
-    Name = "ID da Calça",
-    PlaceholderText = "987654321",
-    CurrentValue = "",
-    Numeric = true,
-    Callback = function(Text) end
-}, "Input")
-
-ClothingTab:CreateButton({
-    Name = "Aplicar Roupa",
-    Callback = function()
-        local shirt = tonumber(ShirtInput:GetValue()) or 0
-        local pants = tonumber(PantsInput:GetValue()) or 0
-        if shirt > 0 or pants > 0 then
-            applyCustomOutfit(shirt, pants)
-        end
-    end
-})
-
-ClothingTab:CreateButton({
-    Name = "Resetar Roupa",
-    Callback = resetOutfit
-})
-
--- Seção Máscaras
-ClothingTab:CreateDivider()
-ClothingTab:CreateSection("🎭 Máscaras")
-
-local MaskDropdown = ClothingTab:CreateDropdown({
-    Name = "Selecionar Máscara",
-    Options = MASKS,
-    CurrentOption = {MASKS[1]},
-    MultipleOptions = false,
-    Callback = function(Options)
-        if Options and #Options > 0 then
-            applyMask(Options[1])
-        end
-    end
-}, "Dropdown")
-
-ClothingTab:CreateButton({
-    Name = "Aplicar Mask I",
-    Callback = function() 
-        applyMask("maski")
-        pcall(function()
-            MaskDropdown:SetCurrentOption({"maski"})
         end)
-    end
-})
-
-ClothingTab:CreateButton({
-    Name = "Aplicar Mask D",
-    Callback = function()
-        applyMask("maskd")
-        pcall(function()
-            MaskDropdown:SetCurrentOption({"maskd"})
-        end)
-    end
-})
-
-ClothingTab:CreateButton({
-    Name = "Remover Máscara",
-    Callback = function()
-        applyMask("nomask")
-        pcall(function()
-            MaskDropdown:SetCurrentOption({})
-        end)
-    end
-})
-
--- ================= TAB DE CONFIGURAÇÕES =================
-local SettingsTab = Window:CreateTab({
-    Name = "⚙️ Configurações",
-    Icon = "settings",
-    ImageSource = "Material",
-    ShowTitle = true
-})
-
-SettingsTab:BuildThemeSection()
-SettingsTab:BuildConfigSection()
-
--- ================= INICIAR PREVIEW AUTOMATICAMENTE =================
-task.spawn(function()
-    task.wait(2)
-    createPreview()
-end)
-
--- ================= CARREGAR CONFIGURAÇÕES =================
-task.spawn(function()
-    task.wait(1)
-    pcall(function()
-        if Window.LoadConfig then
-            Window:LoadConfig()
-        end
-    end)
-end)
-
--- ================= EXPORTAR FUNÇÕES =================
-_G.OraCore = {
-    sendColor = sendColor,
-    applyMask = applyMask,
-    applyCustomOutfit = applyCustomOutfit,
-    resetOutfit = resetOutfit,
-    createPreview = createPreview,
-    destroyPreview = destroyPreview,
-    updatePreview = updatePreview,
-    recreatePreview = recreatePreview,
-    MASKS = MASKS,
-    Window = Window,
-    Luna = Luna
-}
-
-print("Ora Core carregado com sucesso!")
